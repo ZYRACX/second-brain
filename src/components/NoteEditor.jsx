@@ -6,6 +6,7 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
   const [title, setTitle] = useState('');
   const [backlinks, setBacklinks] = useState([]);
 
+  // Sync state when a new note is selected from the sidebar
   useEffect(() => {
     if (activeNote) {
       setTitle(activeNote.title);
@@ -14,6 +15,7 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
     }
   }, [activeNote]);
 
+  // Auto-save debounce (1 second after typing stops)
   useEffect(() => {
     if (!activeNote) return;
     const timeoutId = setTimeout(() => {
@@ -24,6 +26,7 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
     return () => clearTimeout(timeoutId);
   }, [title, content, activeNote, onSave]);
 
+  // Fetch linked mentions
   const fetchBacklinks = async (noteTitle) => {
     const { data } = await supabase
       .from('notes')
@@ -33,31 +36,38 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
     setBacklinks(data || []);
   };
 
-  // 🪄 THE MAGIC: Detect clicks inside [[links]] within a plain text area
+  // Detect clicks strictly inside [[links]] when holding Ctrl/Cmd
   const handleTextareaClick = (e) => {
-    // 1. Find exactly where the user clicked inside the string
+    // Prevent trigger if the user is dragging to highlight/select text
+    if (e.target.selectionStart !== e.target.selectionEnd) return;
+
     const cursorPosition = e.target.selectionStart;
     const text = e.target.value;
-
-    // 2. Find every [[link]] in the document
     const regex = /\[\[(.*?)\]\]/g;
     let match;
     
-    // 3. Loop through them and check if the cursor is currently inside one
     while ((match = regex.exec(text)) !== null) {
       const start = match.index;
       const end = start + match[0].length;
       
-      if (cursorPosition >= start && cursorPosition <= end) {
-        // We found a match! Navigate to the title inside the brackets
+      // Require Ctrl (Windows) or Cmd (Mac) to follow the link.
+      // We use > and < to ensure clicking directly outside the brackets is safe.
+      if ((e.ctrlKey || e.metaKey) && cursorPosition > start && cursorPosition < end) {
         const linkedTitle = match[1];
         onLinkClick(linkedTitle);
-        break; // Stop looking once we found it
+        break; 
       }
     }
   };
 
-  if (!activeNote) return <div className="hidden md:flex p-8 text-gray-500 items-center justify-center h-full w-full">Select or create a note from the sidebar.</div>;
+  // Empty state when no note is selected
+  if (!activeNote) {
+    return (
+      <div className="hidden md:flex p-8 text-gray-500 items-center justify-center h-full w-full">
+        Select or create a note from the sidebar.
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col h-full bg-base p-4 md:p-8 md:max-w-4xl md:mx-auto w-full overflow-hidden">
@@ -70,7 +80,10 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Note Title"
         />
-        <button onClick={() => onDelete(activeNote.id)} className="text-red-500 hover:text-red-400 text-sm md:text-base font-medium transition-colors">
+        <button 
+          onClick={() => onDelete(activeNote.id)} 
+          className="text-red-500 hover:text-red-400 text-sm md:text-base font-medium transition-colors"
+        >
           Delete
         </button>
       </div>
@@ -81,8 +94,8 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
           className="flex-1 w-full bg-transparent border-none outline-none resize-none font-mono text-base text-gray-300 leading-relaxed cursor-text"
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          onClick={handleTextareaClick} // <-- Attached our custom click listener here
-          placeholder="Start typing... Use [[Title]] to link notes. Click directly on a [[link]] to open it."
+          onClick={handleTextareaClick}
+          placeholder="Start typing... Hold Ctrl+Click (or Cmd+Click) on a [[Link]] to open it."
         />
 
         {/* Backlinks Section */}
@@ -92,7 +105,10 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
             <ul className="space-y-2">
               {backlinks.map(bl => (
                 <li key={bl.id}>
-                  <button onClick={() => onLinkClick(bl.title)} className="text-blue-400 hover:text-blue-300 hover:underline text-left w-full transition-colors">
+                  <button 
+                    onClick={() => onLinkClick(bl.title)} 
+                    className="text-blue-400 hover:text-blue-300 hover:underline text-left w-full transition-colors"
+                  >
                     {bl.title}
                   </button>
                 </li>
