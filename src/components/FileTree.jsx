@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronRight, ChevronDown, Folder, File, FolderPlus, FilePlus, FileText, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder, FilePlus, FolderPlus, FileText, Trash2 } from 'lucide-react';
 
 export default function FileTree({ items, category, activeNoteId, onSelect, onCreate, isArchive, onDelete }) {
   const [expanded, setExpanded] = useState(new Set());
@@ -22,12 +22,13 @@ export default function FileTree({ items, category, activeNoteId, onSelect, onCr
           <div className={`group flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-800 cursor-pointer text-gray-300`}>
             
             <div className="flex items-center gap-1.5 flex-1 overflow-hidden" onClick={() => toggleFolder(node.id)} style={{ paddingLeft: `${level * 12}px` }}>
-              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              <Folder size={14} className={isArchive ? "text-gray-500" : "text-blue-400"} />
+              {isExpanded ? <ChevronDown size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />}
+              <Folder size={14} className={`shrink-0 ${isArchive ? "text-gray-500" : "text-blue-400"}`} />
               <span className="truncate text-sm">{node.title}</span>
             </div>
             
-            <div className="hidden group-hover:flex items-center gap-1">
+            {/* MOBILE FIX: Always flex on mobile, hover-only on medium+ screens */}
+            <div className="flex md:hidden md:group-hover:flex items-center gap-1 shrink-0 pl-2">
               {!isArchive && (
                 <>
                   <button onClick={(e) => { e.stopPropagation(); onCreate(category, node.id, false); }} className="p-1 hover:text-white" title="New Note">
@@ -70,11 +71,12 @@ export default function FileTree({ items, category, activeNoteId, onSelect, onCr
         className={`group flex items-center justify-between px-2 py-1.5 rounded cursor-pointer ${isActive ? 'bg-blue-900/50 text-blue-200' : 'hover:bg-gray-800 text-gray-400'}`}
       >
         <div className="flex items-center gap-2 flex-1 overflow-hidden" style={{ paddingLeft: `${(level * 12) + 20}px` }}>
-          <FileText size={14} className={isArchive ? "text-gray-500" : ""} />
+          <FileText size={14} className={`shrink-0 ${isArchive ? "text-gray-500" : ""}`} />
           <span className="truncate text-sm">{node.title}</span>
         </div>
 
-        <div className="hidden group-hover:flex items-center pr-1">
+        {/* MOBILE FIX: Always flex on mobile, hover-only on medium+ screens */}
+        <div className="flex md:hidden md:group-hover:flex items-center pr-1 shrink-0 pl-2">
            <button 
               onClick={(e) => { 
                 e.stopPropagation(); 
