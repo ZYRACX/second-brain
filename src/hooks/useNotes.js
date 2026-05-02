@@ -45,11 +45,9 @@ export function useNotes(session) {
     if (!noteToDelete) return;
 
     if (noteToDelete.category === 'Archive') {
-      // HARD DELETE: If already in the Archive, delete it forever.
       await supabase.from('notes').delete().eq('id', id);
       fetchNotes(); 
     } else {
-      // SOFT DELETE: Move to Archive
       const getDescendantIds = (parentId) => {
         const children = notes.filter(n => n.parent_id === parentId);
         let ids = children.map(c => c.id);

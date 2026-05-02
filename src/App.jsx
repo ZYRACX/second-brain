@@ -24,14 +24,14 @@ export default function App() {
   const activeNote = notes.find(n => n.id === activeNoteId);
   const filteredNotes = notes.filter(n => 
     n.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (n.content && n.content.toLowerCase().includes(searchQuery.toLowerCase()))
+    (n.content && n.content.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (n.tags && n.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
   const handleCreateItem = async (category, parentId = null, isFolder = false) => {
     let baseTitle = isFolder ? prompt('Enter folder name:') : 'Untitled Note';
     if (isFolder && !baseTitle) return; 
 
-    // Prevent duplicate names on creation by appending (1), (2), etc.
     let finalTitle = baseTitle;
     let counter = 1;
     while (notes.some(n => n.title.toLowerCase() === finalTitle.toLowerCase())) {
@@ -66,7 +66,6 @@ export default function App() {
   return (
     <div className="flex h-screen w-full bg-black text-gray-100 font-sans overflow-hidden">
       
-      {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity"
@@ -74,7 +73,6 @@ export default function App() {
         />
       )}
 
-      {/* Sidebar */}
       <div className={`
         fixed inset-y-0 left-0 z-50 w-72 md:w-64 bg-gray-900 border-r border-gray-800 flex flex-col select-none 
         transform transition-transform duration-300 ease-in-out
@@ -91,7 +89,7 @@ export default function App() {
         <div className="p-4 border-b border-gray-800">
           <input 
             className="w-full bg-gray-800 rounded p-2 text-sm outline-none border border-gray-700 focus:border-blue-500 transition-colors"
-            placeholder="Search..."
+            placeholder="Search tags or notes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -131,7 +129,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full">
         <div className="flex items-center p-4 border-b border-gray-800 bg-surface md:hidden shrink-0">
           <button onClick={() => setIsSidebarOpen(true)} className="mr-3 text-gray-400 hover:text-white">
