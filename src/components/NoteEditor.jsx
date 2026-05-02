@@ -6,6 +6,9 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
   const [title, setTitle] = useState('');
   const [backlinks, setBacklinks] = useState([]);
 
+  // Check if the user is on a mobile/touchscreen device
+  const isTouchDevice = window.matchMedia("(pointer: coarse)").matches || 'ontouchstart' in window;
+
   // Sync state when a new note is selected from the sidebar
   useEffect(() => {
     if (activeNote) {
@@ -36,7 +39,7 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
     setBacklinks(data || []);
   };
 
-  // Detect clicks strictly inside [[links]] when holding Ctrl/Cmd
+  // Detect clicks strictly inside [[links]]
   const handleTextareaClick = (e) => {
     // Prevent trigger if the user is dragging to highlight/select text
     if (e.target.selectionStart !== e.target.selectionEnd) return;
@@ -50,9 +53,11 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
       const start = match.index;
       const end = start + match[0].length;
       
-      // Require Ctrl (Windows) or Cmd (Mac) to follow the link.
-      // We use > and < to ensure clicking directly outside the brackets is safe.
-      if ((e.ctrlKey || e.metaKey) && cursorPosition > start && cursorPosition < end) {
+      // If mobile: any tap works. If desktop: require Ctrl/Cmd.
+      const canFollowLink = isTouchDevice ? true : (e.ctrlKey || e.metaKey);
+
+      // We use > and < to ensure tapping/clicking directly outside the brackets is safe.
+      if (canFollowLink && cursorPosition > start && cursorPosition < end) {
         const linkedTitle = match[1];
         onLinkClick(linkedTitle);
         break; 
@@ -95,7 +100,11 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onClick={handleTextareaClick}
-          placeholder="Start typing... Hold Ctrl+Click (or Cmd+Click) on a [[Link]] to open it."
+          placeholder={
+            isTouchDevice 
+              ? "Start typing... Tap inside a [[Link]] to open it."
+              : "Start typing... Hold Ctrl+Click (or Cmd+Click) on a [[Link]] to open it."
+          }
         />
 
         {/* Backlinks Section */}
