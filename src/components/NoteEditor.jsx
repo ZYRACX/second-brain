@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
 import { supabase } from '../lib/supabase';
 
 export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }) {
@@ -34,19 +33,39 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
     setBacklinks(data || []);
   };
 
-  const processedContent = content.replace(
-    /\[\[(.*?)\]\]/g, 
-    (match, title) => `[${title}](#${title.replace(/\s+/g, '-')})`
-  );
+  // 🪄 THE MAGIC: Detect clicks inside [[links]] within a plain text area
+  const handleTextareaClick = (e) => {
+    // 1. Find exactly where the user clicked inside the string
+    const cursorPosition = e.target.selectionStart;
+    const text = e.target.value;
 
-  if (!activeNote) return <div className="hidden md:flex p-8 text-gray-500 items-center justify-center h-full">Select or create a note from the sidebar.</div>;
+    // 2. Find every [[link]] in the document
+    const regex = /\[\[(.*?)\]\]/g;
+    let match;
+    
+    // 3. Loop through them and check if the cursor is currently inside one
+    while ((match = regex.exec(text)) !== null) {
+      const start = match.index;
+      const end = start + match[0].length;
+      
+      if (cursorPosition >= start && cursorPosition <= end) {
+        // We found a match! Navigate to the title inside the brackets
+        const linkedTitle = match[1];
+        onLinkClick(linkedTitle);
+        break; // Stop looking once we found it
+      }
+    }
+  };
+
+  if (!activeNote) return <div className="hidden md:flex p-8 text-gray-500 items-center justify-center h-full w-full">Select or create a note from the sidebar.</div>;
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-base p-4 md:p-6 overflow-hidden">
-      {/* Note Title Header */}
-      <div className="flex justify-between items-center mb-4 md:mb-6 shrink-0 gap-4">
+    <div className="flex-1 flex flex-col h-full bg-base p-4 md:p-8 md:max-w-4xl md:mx-auto w-full overflow-hidden">
+      
+      {/* Title Header */}
+      <div className="flex justify-between items-center mb-6 md:mb-8 shrink-0 gap-4">
         <input 
-          className="text-2xl md:text-3xl font-bold bg-transparent border-none outline-none w-full text-gray-100 placeholder-gray-600"
+          className="text-3xl md:text-4xl font-bold bg-transparent border-none outline-none w-full text-gray-100 placeholder-gray-600 focus:border-b border-gray-700 transition-all pb-2"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Note Title"
@@ -56,52 +75,31 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
         </button>
       </div>
 
-      {/* Editor & Preview Area - Stacked on Mobile, Side-by-Side on Large Desktop */}
-      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 flex-1 min-h-0 overflow-hidden">
-        
-        {/* Editor */}
+      {/* Editor Area */}
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
         <textarea
-          className="flex-1 lg:w-1/2 p-4 rounded-lg bg-surface border border-gray-700 outline-none resize-none overflow-y-auto font-mono text-sm leading-relaxed"
+          className="flex-1 w-full bg-transparent border-none outline-none resize-none font-mono text-base text-gray-300 leading-relaxed cursor-text"
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Start typing... Use [[Title]] to link notes."
+          onClick={handleTextareaClick} // <-- Attached our custom click listener here
+          placeholder="Start typing... Use [[Title]] to link notes. Click directly on a [[link]] to open it."
         />
-        
-        {/* Preview & Backlinks */}
-        <div className="flex-1 lg:w-1/2 flex flex-col overflow-y-auto p-4 rounded-lg bg-surface border border-gray-700">
-          <div className="prose prose-invert prose-sm md:prose-base flex-1 min-w-0 max-w-none">
-            <ReactMarkdown
-              components={{
-                a: ({ node, ...props }) => (
-                  <span 
-                    className="text-blue-400 cursor-pointer hover:underline"
-                    onClick={() => onLinkClick(props.children[0])}
-                  >
-                    [[{props.children}]]
-                  </span>
-                )
-              }}
-            >
-              {processedContent}
-            </ReactMarkdown>
-          </div>
-          
-          {backlinks.length > 0 && (
-            <div className="mt-8 pt-4 border-t border-gray-700 shrink-0">
-              <h4 className="text-sm font-semibold text-gray-400 mb-2">Backlinks</h4>
-              <ul className="text-sm space-y-1">
-                {backlinks.map(bl => (
-                  <li key={bl.id}>
-                    <button onClick={() => onLinkClick(bl.title)} className="text-blue-400 hover:text-blue-300 hover:underline truncate text-left w-full">
-                      {bl.title}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
 
+        {/* Backlinks Section */}
+        {backlinks.length > 0 && (
+          <div className="mt-12 pt-6 border-t border-gray-800 shrink-0">
+            <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Linked Mentions</h4>
+            <ul className="space-y-2">
+              {backlinks.map(bl => (
+                <li key={bl.id}>
+                  <button onClick={() => onLinkClick(bl.title)} className="text-blue-400 hover:text-blue-300 hover:underline text-left w-full transition-colors">
+                    {bl.title}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
