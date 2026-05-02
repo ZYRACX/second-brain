@@ -1,35 +1,49 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
-export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }) {
+export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick, allNotes }) {
   const [content, setContent] = useState('');
   const [title, setTitle] = useState('');
   const [backlinks, setBacklinks] = useState([]);
+  const [titleError, setTitleError] = useState('');
 
-  // Check if the user is on a mobile/touchscreen device
   const isTouchDevice = window.matchMedia("(pointer: coarse)").matches || 'ontouchstart' in window;
 
-  // Sync state when a new note is selected from the sidebar
   useEffect(() => {
     if (activeNote) {
       setTitle(activeNote.title);
       setContent(activeNote.content || '');
+      setTitleError('');
       fetchBacklinks(activeNote.title);
     }
   }, [activeNote]);
 
-  // Auto-save debounce (1 second after typing stops)
   useEffect(() => {
     if (!activeNote) return;
+
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) return; 
+
+    // Prevent saving if the title is a duplicate of another note
+    const isDuplicate = allNotes.some(
+      n => n.id !== activeNote.id && n.title.toLowerCase() === trimmedTitle.toLowerCase()
+    );
+
+    if (isDuplicate) {
+      setTitleError('A note with this title already exists.');
+      return; 
+    } else {
+      setTitleError('');
+    }
+
     const timeoutId = setTimeout(() => {
       if (title !== activeNote.title || content !== activeNote.content) {
-        onSave({ ...activeNote, title, content });
+        onSave({ ...activeNote, title: trimmedTitle, content });
       }
     }, 1000);
     return () => clearTimeout(timeoutId);
-  }, [title, content, activeNote, onSave]);
+  }, [title, content, activeNote, onSave, allNotes]);
 
-  // Fetch linked mentions
   const fetchBacklinks = async (noteTitle) => {
     const { data } = await supabase
       .from('notes')
@@ -39,9 +53,7 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
     setBacklinks(data || []);
   };
 
-  // Detect clicks strictly inside [[links]]
   const handleTextareaClick = (e) => {
-    // Prevent trigger if the user is dragging to highlight/select text
     if (e.target.selectionStart !== e.target.selectionEnd) return;
 
     const cursorPosition = e.target.selectionStart;
@@ -53,10 +65,8 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
       const start = match.index;
       const end = start + match[0].length;
       
-      // If mobile: any tap works. If desktop: require Ctrl/Cmd.
       const canFollowLink = isTouchDevice ? true : (e.ctrlKey || e.metaKey);
 
-      // We use > and < to ensure tapping/clicking directly outside the brackets is safe.
       if (canFollowLink && cursorPosition > start && cursorPosition < end) {
         const linkedTitle = match[1];
         onLinkClick(linkedTitle);
@@ -65,7 +75,6 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
     }
   };
 
-  // Empty state when no note is selected
   if (!activeNote) {
     return (
       <div className="hidden md:flex p-8 text-gray-500 items-center justify-center h-full w-full">
@@ -77,23 +86,30 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
   return (
     <div className="flex-1 flex flex-col h-full bg-base p-4 md:p-8 md:max-w-4xl md:mx-auto w-full overflow-hidden">
       
-      {/* Title Header */}
-      <div className="flex justify-between items-center mb-6 md:mb-8 shrink-0 gap-4">
-        <input 
-          className="text-3xl md:text-4xl font-bold bg-transparent border-none outline-none w-full text-gray-100 placeholder-gray-600 focus:border-b border-gray-700 transition-all pb-2"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Note Title"
-        />
-        <button 
-          onClick={() => onDelete(activeNote.id)} 
-          className="text-red-500 hover:text-red-400 text-sm md:text-base font-medium transition-colors"
-        >
-          Delete
-        </button>
+      <div className="mb-6 md:mb-8 shrink-0">
+        <div className="flex justify-between items-start gap-4">
+          <div className="flex-1">
+            <input 
+              className={`text-3xl md:text-4xl font-bold bg-transparent border-none outline-none w-full text-gray-100 placeholder-gray-600 focus:border-b transition-all pb-2 ${titleError ? 'border-red-500 text-red-400' : 'border-gray-700'}`}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Note Title"
+            />
+            {titleError && <p className="text-red-500 text-sm mt-1">{titleError}</p>}
+          </div>
+          
+          <button 
+            onClick={() => {
+              onDelete(activeNote.id);
+              if (activeNote.category === 'Archive') onLinkClick(null); 
+            }} 
+            className="text-red-500 hover:text-red-400 text-sm md:text-base font-medium transition-colors whitespace-nowrap mt-2"
+          >
+            {activeNote.category === 'Archive' ? 'Delete Forever' : 'Archive'}
+          </button>
+        </div>
       </div>
 
-      {/* Editor Area */}
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
         <textarea
           className="flex-1 w-full bg-transparent border-none outline-none resize-none font-mono text-base text-gray-300 leading-relaxed cursor-text"
@@ -107,7 +123,6 @@ export default function NoteEditor({ activeNote, onSave, onDelete, onLinkClick }
           }
         />
 
-        {/* Backlinks Section */}
         {backlinks.length > 0 && (
           <div className="mt-12 pt-6 border-t border-gray-800 shrink-0">
             <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Linked Mentions</h4>

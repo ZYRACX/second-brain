@@ -41,8 +41,38 @@ export function useNotes(session) {
   };
 
   const deleteNote = async (id) => {
-    await supabase.from('notes').delete().eq('id', id);
-    setNotes(prev => prev.filter(n => n.id !== id));
+    const noteToDelete = notes.find(n => n.id === id);
+    if (!noteToDelete) return;
+
+    if (noteToDelete.category === 'Archive') {
+      // HARD DELETE: If already in the Archive, delete it forever.
+      await supabase.from('notes').delete().eq('id', id);
+      fetchNotes(); 
+    } else {
+      // SOFT DELETE: Move to Archive
+      const getDescendantIds = (parentId) => {
+        const children = notes.filter(n => n.parent_id === parentId);
+        let ids = children.map(c => c.id);
+        children.forEach(c => {
+          ids = [...ids, ...getDescendantIds(c.id)];
+        });
+        return ids;
+      };
+
+      const idsToUpdate = [id, ...getDescendantIds(id)];
+
+      await supabase
+        .from('notes')
+        .update({ category: 'Archive' })
+        .in('id', idsToUpdate);
+        
+      await supabase
+        .from('notes')
+        .update({ parent_id: null })
+        .eq('id', id);
+
+      fetchNotes(); 
+    }
   };
 
   return { notes, saveNote, deleteNote, loading };

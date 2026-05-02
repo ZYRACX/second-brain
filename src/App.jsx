@@ -4,7 +4,7 @@ import { useNotes } from './hooks/useNotes';
 import NoteEditor from './components/NoteEditor';
 import Auth from './components/Auth';
 import FileTree from './components/FileTree';
-import { FolderPlus, FilePlus, Menu, X } from 'lucide-react'; // Added Menu & X icons
+import { FolderPlus, FilePlus, Menu, X } from 'lucide-react'; 
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -12,7 +12,6 @@ export default function App() {
   const [activeNoteId, setActiveNoteId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // New state to control sidebar on mobile
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -29,11 +28,19 @@ export default function App() {
   );
 
   const handleCreateItem = async (category, parentId = null, isFolder = false) => {
-    let title = isFolder ? prompt('Enter folder name:') : 'Untitled Note';
-    if (isFolder && !title) return; 
+    let baseTitle = isFolder ? prompt('Enter folder name:') : 'Untitled Note';
+    if (isFolder && !baseTitle) return; 
+
+    // Prevent duplicate names on creation by appending (1), (2), etc.
+    let finalTitle = baseTitle;
+    let counter = 1;
+    while (notes.some(n => n.title.toLowerCase() === finalTitle.toLowerCase())) {
+      finalTitle = `${baseTitle} (${counter})`;
+      counter++;
+    }
 
     const newItem = await saveNote({ 
-      title, 
+      title: finalTitle, 
       content: '', 
       category,
       parent_id: parentId,
@@ -42,11 +49,15 @@ export default function App() {
     
     if (newItem && !isFolder) {
       setActiveNoteId(newItem.id);
-      setIsSidebarOpen(false); // Close sidebar on mobile after creating a note
+      setIsSidebarOpen(false); 
     }
   };
 
   const navigateToLink = (titleToFind) => {
+    if (!titleToFind) {
+      setActiveNoteId(null);
+      return;
+    }
     const target = notes.find(n => n.title.toLowerCase() === titleToFind.toLowerCase() && !n.is_folder);
     if (target) setActiveNoteId(target.id);
     else alert("Note not found.");
@@ -55,7 +66,7 @@ export default function App() {
   return (
     <div className="flex h-screen w-full bg-black text-gray-100 font-sans overflow-hidden">
       
-      {/* Mobile Overlay Background */}
+      {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity"
@@ -63,14 +74,13 @@ export default function App() {
         />
       )}
 
-      {/* Sidebar: Fixed on mobile, relative on desktop */}
+      {/* Sidebar */}
       <div className={`
         fixed inset-y-0 left-0 z-50 w-72 md:w-64 bg-gray-900 border-r border-gray-800 flex flex-col select-none 
         transform transition-transform duration-300 ease-in-out
         md:relative md:translate-x-0
         ${isSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}
       `}>
-        {/* Mobile Sidebar Header with Close Button */}
         <div className="flex items-center justify-between p-4 border-b border-gray-800 md:hidden">
           <span className="font-bold text-gray-300">My Brain</span>
           <button onClick={() => setIsSidebarOpen(false)} className="text-gray-400 hover:text-white">
@@ -92,10 +102,13 @@ export default function App() {
             <div key={category} className="mb-4">
               <div className="flex justify-between items-center px-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
                 {category}s
-                <div className="flex gap-2">
-                  <button onClick={() => handleCreateItem(category, null, false)} className="hover:text-white" title="New Root File"><FilePlus size={14}/></button>
-                  <button onClick={() => handleCreateItem(category, null, true)} className="hover:text-white" title="New Root Folder"><FolderPlus size={14}/></button>
-                </div>
+                
+                {category !== 'Archive' && (
+                  <div className="flex gap-2">
+                    <button onClick={() => handleCreateItem(category, null, false)} className="hover:text-white" title="New Root File"><FilePlus size={14}/></button>
+                    <button onClick={() => handleCreateItem(category, null, true)} className="hover:text-white" title="New Root Folder"><FolderPlus size={14}/></button>
+                  </div>
+                )}
               </div>
               
               <FileTree 
@@ -104,9 +117,11 @@ export default function App() {
                 activeNoteId={activeNoteId} 
                 onSelect={(id) => {
                   setActiveNoteId(id);
-                  setIsSidebarOpen(false); // Close sidebar on mobile when note is selected
+                  setIsSidebarOpen(false); 
                 }}
                 onCreate={handleCreateItem}
+                isArchive={category === 'Archive'} 
+                onDelete={deleteNote}
               />
             </div>
           ))}
@@ -118,7 +133,6 @@ export default function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full">
-        {/* Mobile Header (Hidden on Desktop) */}
         <div className="flex items-center p-4 border-b border-gray-800 bg-surface md:hidden shrink-0">
           <button onClick={() => setIsSidebarOpen(true)} className="mr-3 text-gray-400 hover:text-white">
             <Menu size={24} />
@@ -128,12 +142,12 @@ export default function App() {
           </span>
         </div>
 
-        {/* Editor Area */}
         <NoteEditor 
           activeNote={activeNote} 
           onSave={saveNote} 
           onDelete={deleteNote}
           onLinkClick={navigateToLink}
+          allNotes={notes}
         />
       </div>
     </div>
